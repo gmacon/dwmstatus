@@ -1,0 +1,6 @@
+[package]
+name = "dwmstatus"
+version = "0.1.0"
+authors = ["George Macon <george.macon@gmail.com>"]
+
+[dependencies]
