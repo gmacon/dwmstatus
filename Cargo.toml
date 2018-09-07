@@ -5,3 +5,5 @@ authors = ["George Macon <george.macon@gmail.com>"]
 
 [dependencies]
 chrono = "^0.4.6"
+sensors = "^0.2.1"
+systemstat = "^0.1.3"
