@@ -8,6 +8,7 @@
 extern crate chrono;
 extern crate sensors;
 extern crate systemstat;
+extern crate xcb;
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
@@ -16,11 +17,19 @@ use std::time;
 use sensors::{FeatureType, Sensors, Subfeature, SubfeatureType};
 use systemstat::{Platform, System};
 
+const POLL_TIME: time::Duration = time::Duration::from_secs(5);
+
 #[derive(Debug)]
 struct DisplayFields {
     time: String,
     systemstat: String,
     temp: String,
+}
+
+impl ToString for DisplayFields {
+    fn to_string(&self) -> String {
+        format!("{} ⸱ {} ⸱ {}", self.systemstat, self.temp, self.time).to_string()
+    }
 }
 
 #[derive(Debug)]
@@ -95,7 +104,7 @@ fn systemstat_thread(conc: Arc<Concurrency>) {
                 conc.condition.notify_one();
             }
         }
-        thread::sleep(time::Duration::from_secs(5));
+        thread::sleep(POLL_TIME);
     }
 }
 
@@ -126,16 +135,34 @@ fn sensors_thread(conc: Arc<Concurrency>) {
                     conc.condition.notify_one();
                 }
             }
-            thread::sleep(time::Duration::from_secs(5));
+            thread::sleep(POLL_TIME);
         }
     }
 }
 
 fn display_thread(conc: Arc<Concurrency>) {
-    let mut df = conc.lock.lock().unwrap();
+    let (xconn, screen_num) = xcb::Connection::connect(None).unwrap();
+    let setup = xconn.get_setup();
+    let screen = setup.roots().nth(screen_num as usize).unwrap();
+    let root_window = screen.root();
+
     loop {
-        println!("{:?}", *df);
-        df = conc.condition.wait(df).unwrap();
+        let new_status;
+        {
+            let mut df = conc.lock.lock().unwrap();
+            df = conc.condition.wait(df).unwrap();
+            new_status = df.to_string();
+        }
+        xcb::xproto::change_property(
+            &xconn,
+            xcb::xproto::PROP_MODE_REPLACE as u8,
+            root_window,
+            xcb::xproto::ATOM_WM_NAME,
+            xcb::xproto::ATOM_STRING,
+            8,
+            new_status.as_bytes(),
+        );
+        xconn.flush();
     }
 }
 
