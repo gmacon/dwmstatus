@@ -44,11 +44,15 @@ struct DisplayFields {
     systemstat: String,
     temp: String,
     net: String,
+    volume: String,
 }
 
 impl ToString for DisplayFields {
     fn to_string(&self) -> String {
-        format!("{}{}{}{}", self.net, self.systemstat, self.temp, self.time).to_string()
+        format!(
+            "{}{}{}{}{}",
+            self.volume, self.net, self.systemstat, self.temp, self.time
+        ).to_string()
     }
 }
 
@@ -194,14 +198,15 @@ fn get_current_interface() -> Result<String> {
 fn network_thread(conc: Arc<Concurrency>) {
     let wireless = "📡 ⸱ ";
     let wired = "⇅ ⸱ ";
+
     let wifs = get_wireless_interfaces();
+
     let monitor = Command::new("ip")
         .arg("monitor")
         .arg("link")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
-
     let mut stdout = monitor.stdout.unwrap();
     let mut buffer = [0; 1024];
 
@@ -224,6 +229,69 @@ fn network_thread(conc: Arc<Concurrency>) {
             }
         }
         stdout.read(&mut buffer).unwrap();
+    }
+}
+
+fn get_mute() -> Result<bool> {
+    let output = Command::new("pamixer")
+        .arg("--get-mute")
+        .output()
+        .chain_err(|| "subprocess")?;
+    let mute_string = String::from_utf8(output.stdout).chain_err(|| "decode")?;
+    return Ok(mute_string.trim() == String::from("true"));
+}
+
+fn get_volume() -> Result<i32> {
+    let output = Command::new("pamixer")
+        .arg("--get-volume")
+        .output()
+        .chain_err(|| "subprocess")?;
+    let volume_string = String::from_utf8(output.stdout).chain_err(|| "decode")?;
+    return Ok(volume_string.trim().parse().chain_err(|| "parse")?);
+}
+
+fn volume() -> String {
+    if let Ok(muted) = get_mute() {
+        if muted {
+            return "🔇 ⸱ ".to_string();
+        }
+    }
+
+    if let Ok(volume) = get_volume() {
+        let speaker = match volume {
+            0...33 => "🔈",
+            34...66 => "🔉",
+            _ => "🔊",
+        };
+        return format!("{} {} ⸱ ", speaker, volume);
+    }
+    return "".to_string();
+}
+
+fn volume_thread(conc: Arc<Concurrency>) {
+    let re = Regex::new(r"on sink").unwrap();
+
+    let monitor = Command::new("pactl")
+        .arg("subscribe")
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdout = monitor.stdout.unwrap();
+    let mut reader = BufReader::new(stdout);
+
+    loop {
+        let new_volume = volume();
+        {
+            let mut df = conc.lock.lock().unwrap();
+            if df.volume != new_volume {
+                df.volume = new_volume;
+                conc.condition.notify_one();
+            }
+        }
+        let mut line = String::new();
+        while !re.is_match(&line) {
+            reader.read_line(&mut line).unwrap();
+        }
     }
 }
 
@@ -260,6 +328,7 @@ fn main() {
             systemstat: String::new(),
             temp: String::new(),
             net: String::new(),
+            volume: String::new(),
         }),
         condition: Condvar::new(),
     });
@@ -282,6 +351,11 @@ fn main() {
     {
         let conc2 = Arc::clone(&conc);
         thread::spawn(move || network_thread(conc2));
+    }
+
+    {
+        let conc2 = Arc::clone(&conc);
+        thread::spawn(move || volume_thread(conc2));
     }
 
     display_thread(conc);
