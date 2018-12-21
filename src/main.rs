@@ -7,15 +7,8 @@
 
 #![recursion_limit = "1024"]
 
-extern crate chrono;
 #[macro_use]
 extern crate error_chain;
-extern crate regex;
-#[macro_use]
-extern crate lazy_static;
-extern crate sensors;
-extern crate systemstat;
-extern crate xcb;
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -26,15 +19,18 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time;
 
+use chrono;
+use lazy_static::lazy_static;
 use regex::Regex;
 use sensors::{FeatureType, Sensors, Subfeature, SubfeatureType};
 use systemstat::{Platform, System};
+use xcb;
 
 mod errors {
-    error_chain!{}
+    error_chain! {}
 }
 
-use errors::*;
+use crate::errors::*;
 
 const POLL_TIME: time::Duration = time::Duration::from_secs(5);
 const NET_STABILIZATION_DELAY: time::Duration = time::Duration::from_secs(15);
@@ -53,7 +49,8 @@ impl ToString for DisplayFields {
         format!(
             "{}{}{}{}{}",
             self.volume, self.net, self.systemstat, self.temp, self.time
-        ).to_string()
+        )
+        .to_string()
     }
 }
 
@@ -222,7 +219,8 @@ fn network_thread(conc: Arc<Concurrency>) {
                 }
             }
             Err(_) => "",
-        }.to_string();
+        }
+        .to_string();
         {
             let mut df = conc.lock.lock().unwrap();
             df.net = new_symbol;
@@ -265,8 +263,8 @@ fn volume() -> String {
 
     if let Ok(volume) = get_volume() {
         let speaker = match volume {
-            0...33 => "🔈",
-            34...66 => "🔉",
+            0..=33 => "🔈",
+            34..=66 => "🔉",
             _ => "🔊",
         };
         return format!("{} {} ⸱ ", speaker, volume);
