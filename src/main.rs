@@ -91,7 +91,11 @@ fn plugged(sys: &System) -> String {
 
 fn battery(sys: &System) -> String {
     if let Ok(bat) = sys.battery_life() {
-        format!("{} {:.1}% ⸱ ", plugged(sys), bat.remaining_capacity * 100.)
+        format!(
+            "{} {:.1}% ⸱ ",
+            plugged(sys),
+            bat.remaining_capacity * 100.
+        )
     } else {
         "".to_string()
     }
@@ -117,8 +121,7 @@ fn cpu(sys: &System) -> String {
 fn systemstat_thread(conc: Arc<Concurrency>) {
     let sys = System::new();
     loop {
-        let new_stat =
-            format!("{}{} ⸱ {} ⸱ ", battery(&sys), ram(&sys), cpu(&sys)).to_string();
+        let new_stat = format!("{}{} ⸱ {} ⸱ ", battery(&sys), ram(&sys), cpu(&sys)).to_string();
         {
             let mut df = conc.lock.lock().unwrap();
             if df.systemstat != new_stat {
