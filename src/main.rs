@@ -33,7 +33,6 @@ mod errors {
 use crate::errors::*;
 
 const POLL_TIME: time::Duration = time::Duration::from_secs(5);
-const NET_STABILIZATION_DELAY: time::Duration = time::Duration::from_secs(15);
 
 #[derive(Debug)]
 struct DisplayFields {
@@ -196,13 +195,13 @@ fn get_current_interface() -> Result<String> {
 fn network_thread(conc: Arc<Concurrency>) {
     let wireless = "📡 ⸱ ";
     let wired = "⇅ ⸱ ";
-    let wait = "⋯ ⸱ ";
 
     let wifs = get_wireless_interfaces();
 
     let monitor = Command::new("ip")
         .arg("monitor")
         .arg("link")
+        .arg("address")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
@@ -227,12 +226,6 @@ fn network_thread(conc: Arc<Concurrency>) {
             conc.condition.notify_one();
         }
         stdout.read(&mut buffer).unwrap();
-        {
-            let mut df = conc.lock.lock().unwrap();
-            df.net = wait.to_string();
-            conc.condition.notify_one();
-        }
-        thread::sleep(NET_STABILIZATION_DELAY);
     }
 }
 
