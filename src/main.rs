@@ -150,7 +150,7 @@ fn sensors_thread(conc: Arc<Concurrency>) {
     let sensors = Sensors::new();
     if let Some(temp_sensor) = find_cpu_temp(&sensors) {
         loop {
-            let new_temp = format!("\u{1F321} {} ⸱ ", temp_sensor.get_value().unwrap());
+            let new_temp = format!("\u{1F321} {:.1} ⸱ ", temp_sensor.get_value().unwrap());
             {
                 let mut df = conc.lock.lock().unwrap();
                 if df.temp != new_temp {
