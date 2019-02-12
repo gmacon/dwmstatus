@@ -61,9 +61,9 @@ struct Concurrency {
 
 fn time_thread(conc: Arc<Concurrency>) {
     loop {
-        let new_time = chrono::Local::now()
-            .format("📆 %a, %d %h ⸱ 🕓 %R")
-            .to_string();
+        let new_local_time = chrono::Local::now().format("📆 %a, %d %h ⸱ 🕓 %R");
+        let new_utc_time = chrono::Utc::now().format("%RZ");
+        let new_time = format!("{} {}", new_local_time, new_utc_time).to_string();
         {
             let mut df = conc.lock.lock().unwrap();
             df.time = new_time;
