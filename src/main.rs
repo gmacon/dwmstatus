@@ -272,27 +272,33 @@ fn volume() -> String {
 fn volume_thread(conc: Arc<Concurrency>) {
     let re = Regex::new(r"on sink").unwrap();
 
-    let monitor = Command::new("pactl")
-        .arg("subscribe")
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
-    let stdout = monitor.stdout.unwrap();
-    let mut reader = BufReader::new(stdout);
-
     loop {
-        let new_volume = volume();
-        {
-            let mut df = conc.lock.lock().unwrap();
-            if df.volume != new_volume {
-                df.volume = new_volume;
-                conc.condition.notify_one();
+        let mut monitor = Command::new("pactl")
+            .arg("subscribe")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let stdout = monitor.stdout.take().unwrap();
+        let mut reader = BufReader::new(stdout);
+
+        'events: loop {
+            let new_volume = volume();
+            {
+                let mut df = conc.lock.lock().unwrap();
+                if df.volume != new_volume {
+                    df.volume = new_volume;
+                    conc.condition.notify_one();
+                }
+            }
+            let mut line = String::new();
+            while !re.is_match(&line) {
+                if reader.read_line(&mut line).unwrap() == 0 {
+                    break 'events;
+                }
             }
         }
-        let mut line = String::new();
-        while !re.is_match(&line) {
-            reader.read_line(&mut line).unwrap();
-        }
+
+        monitor.wait().unwrap();
     }
 }
 
