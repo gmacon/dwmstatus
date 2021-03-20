@@ -92,11 +92,7 @@ fn plugged(sys: &System) -> String {
 
 fn battery(sys: &System) -> String {
     if let Ok(bat) = sys.battery_life() {
-        format!(
-            "{} {:.1}% ⸱ ",
-            plugged(sys),
-            bat.remaining_capacity * 100.
-        )
+        format!("{} {:.1}% ⸱ ", plugged(sys), bat.remaining_capacity * 100.)
     } else {
         "".to_string()
     }
