@@ -115,10 +115,25 @@ fn cpu(sys: &System) -> String {
     }
 }
 
+fn disk(sys: &System) -> String {
+    if let Ok(fs) = sys.mount_at("/") {
+        format!("🖴 {} ⸱ ", fs.free.to_string(false))
+    } else {
+        "".to_string()
+    }
+}
+
 fn systemstat_thread(conc: Arc<Concurrency>) {
     let sys = System::new();
     loop {
-        let new_stat = format!("{}{} ⸱ {} ⸱ ", battery(&sys), ram(&sys), cpu(&sys)).to_string();
+        let new_stat = format!(
+            "{}{}{} ⸱ {} ⸱ ",
+            battery(&sys),
+            disk(&sys),
+            ram(&sys),
+            cpu(&sys)
+        )
+        .to_string();
         {
             let mut df = conc.lock.lock().unwrap();
             if df.systemstat != new_stat {
